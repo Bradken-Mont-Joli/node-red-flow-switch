@@ -1,0 +1,152 @@
+<script type="text/javascript">
+    RED.nodes.registerType('flow-switch', { // Nom du nœud changé
+        category: 'function',
+        color: '#E6E0F8',
+        defaults: {
+            name: { value: "" },
+            currentState: { value: true, required: true }, // Ceci est "l'État au démarrage"
+            controlTopic: { value: "" },
+            onValue: { value: "on" },
+            offValue: { value: "off" },
+            toggleValue: { value: "toggle" },
+            onStatusText: { value: "on" },
+            offStatusText: { value: "off" },
+            passThrough: { value: false }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-toggle-on", // Icône statique
+        label: function() {
+            return this.name || "flow-switch"; // Label par défaut changé
+        },
+        oneditprepare: function() {
+            if (typeof this.currentState !== 'boolean') { 
+                this.currentState = (this.currentState === 'true' || this.currentState === true);
+            }
+            this._editorButtonState = this.currentState; 
+
+            $('#node-input-currentState').val(this.currentState.toString());
+            $('#node-input-onStatusText').val(this.onStatusText);
+            $('#node-input-offStatusText').val(this.offStatusText);
+            
+            if (typeof this.passThrough !== 'boolean') {
+                this.passThrough = (this.passThrough === 'true' || this.passThrough === true);
+            }
+            $('#node-input-passThrough').prop('checked', this.passThrough);
+        },
+        oneditsave: function() {
+            this.currentState = ($('#node-input-currentState').val() === 'true');
+            this.passThrough = $('#node-input-passThrough').is(':checked');
+        },
+        button: {
+            visible: true,
+            onclick: function() {
+                this._editorButtonState = !this._editorButtonState;
+                var stateToSend = this._editorButtonState;
+
+                console.log("[flow-switch] Bouton cliqué (manuel). Nouvel état envoyé au runtime :", stateToSend); // Log mis à jour
+
+                $.ajax({
+                    url: `flow-switch-admin/${this.id}/state`, // URL AJAX mise à jour
+                    type: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify({ state: stateToSend }),
+                    success: function(response) {
+                        RED.notify("Interrupteur (runtime) : " + (stateToSend ? "Activé" : "Désactivé"), "success", null, 1000);
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        RED.notify("Erreur de communication : " + errorThrown, "error");
+                    }.bind(this)
+                });
+            }
+        }
+    });
+</script>
+
+<script type="text/x-red" data-template-name="flow-switch"> {/* Nom du template changé */}
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Nom</label>
+        <input type="text" id="node-input-name" placeholder="Nom">
+    </div>
+    <div class="form-row">
+        <label for="node-input-currentState"><i class="fa fa-cogs"></i> État au démarrage</label>
+        <select id="node-input-currentState">
+            <option value="true">on (activé)</option>
+            <option value="false">off (désactivé)</option>
+        </select>
+        {/* Tooltip supprimé */}
+    </div>
+    <hr/>
+    <h4>Affichage du Statut (sous le nœud)</h4>
+    <div class="form-row">
+        <label for="node-input-onStatusText"><i class="fa fa-commenting-o"></i> Texte si ON</label>
+        <input type="text" id="node-input-onStatusText" placeholder="on">
+    </div>
+    <div class="form-row">
+        <label for="node-input-offStatusText"><i class="fa fa-commenting-o"></i> Texte si OFF</label>
+        <input type="text" id="node-input-offStatusText" placeholder="off">
+    </div>
+    <hr/>
+    <h4>Contrôle par Message</h4>
+    <div class="form-row">
+        <label for="node-input-controlTopic"><i class="fa fa-envelope"></i> Sujet de contrôle (<code>msg.topic</code>)</label>
+        <input type="text" id="node-input-controlTopic" placeholder="ex: cmnd/interrupteur/etat">
+        {/* Tooltip supprimé */}
+    </div>
+    <div class="form-row">
+        <label><i class="fa fa-asterisk"></i> Valeurs de commande (<code>msg.payload</code>)</label>
+    </div>
+    <div class="form-row">
+        <label for="node-input-onValue" style="padding-left: 20px;"><i class="fa fa-check-circle-o"></i> pour Activer</label>
+        <input type="text" id="node-input-onValue" placeholder="on">
+        {/* Tooltip supprimé */}
+    </div>
+    <div class="form-row">
+        <label for="node-input-offValue" style="padding-left: 20px;"><i class="fa fa-times-circle-o"></i> pour Désactiver</label>
+        <input type="text" id="node-input-offValue" placeholder="off">
+        {/* Tooltip supprimé */}
+    </div>
+    <div class="form-row">
+        <label for="node-input-toggleValue" style="padding-left: 20px;"><i class="fa fa-exchange"></i> pour Basculer</label>
+        <input type="text" id="node-input-toggleValue" placeholder="toggle">
+        {/* Tooltip supprimé */}
+    </div>
+    <div class="form-row">
+        <input type="checkbox" id="node-input-passThrough" style="display: inline-block; width: auto; vertical-align: top;">
+        <label for="node-input-passThrough" style="width: auto; margin-left: 7px;"><i class="fa fa-share-square-o"></i> Transmettre le message de contrôle ?</label>
+        {/* Tooltip supprimé */}
+    </div>
+</script>
+
+<script type="text/x-red" data-help-name="flow-switch"> {/* Nom de l'aide changé */}
+    <p>Un interrupteur (flow switch) qui peut arrêter ou autoriser un flux de messages à continuer. Il peut être contrôlé par son bouton UI ou par des messages entrants.</p>
+    <p>Cliquez sur le bouton à droite du nœud pour envoyer une commande de basculement à l'état d'exécution du nœud. L'état d'exécution actuel est indiqué par le statut visuel sous le nœud.</p>
+    
+    <h3>Configuration</h3>
+    <dl class="message-properties">
+        <dt>État au démarrage</dt>
+        <dd>Définit l'état de l'interrupteur (ON ou OFF) qui sera appliqué uniquement lorsque le flux est déployé ou que Node-RED redémarre. Cet état n'est pas modifié par le bouton dans l'éditeur.</dd>
+        <dt>Texte si ON</dt>
+        <dd>Le texte à afficher dans le statut du nœud lorsque l'interrupteur est ON. Défaut: "on".</dd>
+        <dt>Texte si OFF</dt>
+        <dd>Le texte à afficher dans le statut du nœud lorsque l'interrupteur est OFF. Défaut: "off".</dd>
+    </dl>
+
+    <h3>Contrôle par Message</h3>
+    <p>Le nœud peut être contrôlé dynamiquement en envoyant un message.</p>
+    <dl class="message-properties">
+        <dt>Sujet de contrôle (<code>msg.topic</code>)</dt>
+        <dd>Si ce champ est configuré, le nœud traitera les messages entrants où <code>msg.topic</code> correspond à cette valeur comme des commandes. Le <code>msg.payload</code> sera alors utilisé pour contrôler l'interrupteur.</dd>
+        <dt>Valeurs de commande (<code>msg.payload</code>)</dt>
+        <dd>
+            <ul>
+                <li><strong>pour Activer:</strong> Si <code>msg.payload</code> correspond à cette valeur, l'interrupteur passera à ON.</li>
+                <li><strong>pour Désactiver:</strong> Si <code>msg.payload</code> correspond à cette valeur, l'interrupteur passera à OFF.</li>
+                <li><strong>pour Basculer:</strong> Si <code>msg.payload</code> correspond à cette valeur, l'état de l'interrupteur sera inversé.</li>
+            </ul>
+        </dd>
+        <dt>Transmettre le message de contrôle ?</dt>
+        <dd>Si coché, le message qui a servi à contrôler l'interrupteur sera transmis à la sortie du nœud après que l'action ait été effectuée. Sinon, les messages de contrôle sont consommés par le nœud.</dd>
+    </dl>
+    <p>Les messages qui ne sont pas des messages de contrôle sont transmis à la sortie uniquement si l'interrupteur est ON.</p>
+</script>

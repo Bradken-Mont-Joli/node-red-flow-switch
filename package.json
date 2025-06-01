@@ -1,0 +1,24 @@
+{
+    "name": "@bkmj/node-red-contrib-flow-switch",
+    "version": "0.1.0",
+    "description": "Un nœud Node-RED qui agit comme un interrupteur avec un bouton UI sur le nœud.",
+    "dependencies": {},
+    "keywords": [
+        "node-red"
+    ],
+    "node-red": {
+        "nodes": {
+            "flow-switch": "flow-switch.js"
+        }
+    },
+  "license": "Apache-2.0",
+  "author": "Marc-André Morneau <ma.morneau.1@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mamorneau/node-red-contrib-flow-switch.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mamorneau/node-red-contrib-flow-switch/issues"
+  },
+  "homepage": "https://github.com/mamorneau/node-red-contrib-flow-switch#readme"
+}
