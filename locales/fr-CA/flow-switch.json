@@ -1,0 +1,70 @@
+{
+    "paletteLabel": "commutateur de flux",
+    "label": {
+        "name": "Nom",
+        "deployMode": "Comportement au déploiement",
+        "initialState": "État initial au déploiement",
+        "passThrough": "Transmettre le message de contrôle ?",
+        "statusDisplay": "Affichage du statut (sous le nœud)",
+        "textIfON": "Texte si ON",
+        "textIfOFF": "Texte si OFF",
+        "controlByMessage": "Contrôle par message",
+        "controlTopicShort": "Sujet de contrôle",
+        "controlValuesShort": "Valeurs de contrôle",
+        "valueForON": "pour ON",
+        "valueForOFF": "pour OFF",
+        "valueForToggle": "pour Basculer"
+    },
+    "placeholder": {
+        "name": "Nom du commutateur de flux",
+        "onStatusText": "on",
+        "offStatusText": "off",
+        "controlTopic": "ex: cmnd/commutateur/etat",
+        "onValue": "on",
+        "offValue": "off",
+        "toggleValue": "toggle"
+    },
+    "options": {
+        "deployModeInitial": "Utiliser la valeur 'État initial au déploiement'",
+        "deployModeLast": "Conserver le dernier état actif",
+        "onActive": "on (actif)",
+        "offInactive": "off (inactif)"
+    },
+    "notify": {
+        "runtimeState": "Commutateur (exécution)",
+        "activated": "Activé",
+        "deactivated": "Désactivé",
+        "communicationError": "Erreur de communication"
+    },
+    "defaults": {
+        "onText": "on",
+        "offText": "off"
+    },
+    "warn": {
+        "unrecognizedPayload": "Message de contrôle reçu sur le sujet \"__topic__\" avec un payload non reconnu : \"__payload__\""
+    },
+    "error": {
+        "invalidState": "État invalide dans le corps de la requête. Attendu : booléen ou 'true'/'false'. Reçu : __state__ (Type : __type__)",
+        "failedToToggle": "Échec du basculement de l'état du commutateur : __error__"
+    },
+    "help": {
+        "brief": "Un nœud commutateur qui peut bloquer ou autoriser le passage des messages, contrôlé par son bouton UI ou par des messages.",
+        "clickButton": "Cliquez sur le bouton du nœud pour basculer son état d'exécution. L'état actuel est affiché sous le nœud, utilisant un texte personnalisable.",
+        "configTitle": "Configuration",
+        "deployModeDesc": "Détermine comment le commutateur initialise son état lors du déploiement ou du redémarrage.",
+        "initialStateDescDeployMode": "Définit l'état du commutateur (ON ou OFF) appliqué si \"Utiliser la valeur 'État initial au déploiement'\" est choisi. N'est pas modifié par le bouton de l'éditeur.",
+        "passThroughDesc": "Si coché, le message de contrôle sera transmis à la sortie après l'action. Sinon, les messages de contrôle sont consommés.",
+        "textIfONDesc": "Texte affiché dans le statut du nœud si ON. Défaut : \"on\".",
+        "textIfOFFDesc": "Texte affiché dans le statut du nœud si OFF. Défaut : \"off\".",
+        "controlByMessageTitle": "Contrôle par Message",
+        "controlByMessageDesc": "Le nœud peut être contrôlé dynamiquement par un message entrant.",
+        "controlTopic": "Sujet de contrôle (msg.topic)",
+        "controlTopicDesc": "Si défini, le nœud traitera les messages entrants où <code>msg.topic</code> correspond à cette valeur comme des commandes. <code>msg.payload</code> sera alors utilisé pour contrôler le commutateur.",
+        "controlValues": "Valeurs de contrôle (<code>msg.payload</code>)",
+        "valueForONDesc": "Si <code>msg.payload</code> correspond à cette valeur, le commutateur passe à ON.",
+        "valueForOFFDesc": "Si <code>msg.payload</code> correspond à cette valeur, le commutateur passe à OFF.",
+        "valueForToggleDesc": "Si <code>msg.payload</code> correspond à cette valeur, l'état du commutateur est inversé.",
+        "unrecognizedPayloadWarn": "Si un message est reçu sur le sujet de contrôle mais que son payload ne correspond à aucune des valeurs configurées (ON, OFF, Basculer), un avertissement sera émis et l'état ne changera pas.",
+        "nonControlMessages": "Les messages non destinés au contrôle ne sont transmis à la sortie que si le commutateur est ON."
+    }
+}

@@ -1,0 +1,70 @@
+{
+    "paletteLabel": "flow switch",
+    "label": {
+        "name": "Name",
+        "deployMode": "Behavior on Deploy",
+        "initialState": "Initial state on deploy",
+        "passThrough": "Pass through control message?",
+        "statusDisplay": "Status Display (under node)",
+        "textIfON": "Text if ON",
+        "textIfOFF": "Text if OFF",
+        "controlByMessage": "Control by Message",
+        "controlTopicShort": "Control Topic",
+        "controlValuesShort": "Control Values",
+        "valueForON": "for ON",
+        "valueForOFF": "for OFF",
+        "valueForToggle": "for Toggle"
+    },
+    "placeholder": {
+        "name": "Flow Switch Name",
+        "onStatusText": "on",
+        "offStatusText": "off",
+        "controlTopic": "e.g., cmnd/switch/state",
+        "onValue": "on",
+        "offValue": "off",
+        "toggleValue": "toggle"
+    },
+    "options": {
+        "deployModeInitial": "Use 'Initial state on deploy' value",
+        "deployModeLast": "Keep last active state",
+        "onActive": "on (active)",
+        "offInactive": "off (inactive)"
+    },
+    "notify": {
+        "runtimeState": "Switch (runtime)",
+        "activated": "Activated",
+        "deactivated": "Deactivated",
+        "communicationError": "Communication error"
+    },
+    "defaults": {
+        "onText": "on",
+        "offText": "off"
+    },
+    "warn": {
+        "unrecognizedPayload": "Control message received on topic \"__topic__\" with unrecognized payload: \"__payload__\""
+    },
+    "error": {
+        "invalidState": "Invalid state in request body. Expecting a boolean or 'true'/'false'. Received: __state__ (Type: __type__)",
+        "failedToToggle": "Failed to toggle switch state: __error__"
+    },
+    "help": {
+        "brief": "A switch node that can gate message flow, controlled by its UI button or by messages.",
+        "clickButton": "Click the button on the node to toggle its runtime state. The current runtime state is shown in the status display below the node, using customizable text.",
+        "configTitle": "Configuration",
+        "deployModeDesc": "Determines how the switch initializes its state upon deployment or restart.",
+        "initialStateDescDeployMode": "Defines the switch state (ON or OFF) applied if \"Use 'Initial state on deploy' value\" is chosen. This is not changed by the editor button.",
+        "passThroughDesc": "If checked, the control message will be forwarded to the output after the action. Otherwise, control messages are consumed.",
+        "textIfONDesc": "Text shown in node status when ON. Default: \"on\".",
+        "textIfOFFDesc": "Text shown in node status when OFF. Default: \"off\".",
+        "controlByMessageTitle": "Control by Message",
+        "controlByMessageDesc": "The node can be dynamically controlled by an incoming message.",
+        "controlTopic": "Control Topic (msg.topic)",
+        "controlTopicDesc": "If set, the node will treat incoming messages where <code>msg.topic</code> matches this value as commands. <code>msg.payload</code> will then be used to control the switch.",
+        "controlValues": "Control Values (<code>msg.payload</code>)",
+        "valueForONDesc": "If <code>msg.payload</code> matches this value, switch turns ON.",
+        "valueForOFFDesc": "If <code>msg.payload</code> matches this value, switch turns OFF.",
+        "valueForToggleDesc": "If <code>msg.payload</code> matches this value, switch state is toggled.",
+        "unrecognizedPayloadWarn": "If a message is received on the control topic but its payload doesn't match any configured values (ON, OFF, Toggle), a warning will be issued, and the switch state will not change.",
+        "nonControlMessages": "Non-control messages are only passed to the output if the switch is ON."
+    }
+}

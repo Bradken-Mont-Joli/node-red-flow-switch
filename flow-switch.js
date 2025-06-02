@@ -1,22 +1,61 @@
 // Fichier : flow-switch.js
 module.exports = function(RED) {
-    function FlowSwitchNode(config) { // Nom de la fonction constructeur mis à jour (convention)
+    // --- Chargement du catalogue de messages pour i18n ---
+    var fs = require('fs');
+    var path = require('path');
+    var localesPath = path.join(__dirname, "locales");
+
+    if (RED && typeof RED.i18n !== 'undefined' && typeof RED.i18n.registerMessageCatalog === 'function') {
+        if (fs.existsSync(localesPath)) {
+            try {
+                RED.i18n.registerMessageCatalog("flow-switch", localesPath);
+                console.log("[flow-switch] Message catalog successfully registered from:", localesPath);
+            } catch (e) {
+                console.error("[flow-switch] Error registering message catalog:", e);
+                console.warn("[flow-switch] i18n may not work as expected due to an error during registration.");
+            }
+        } else {
+            console.warn("[flow-switch] Locales directory not found at:", localesPath, "- Message catalog not registered. i18n will rely on default texts or show keys.");
+        }
+    } else {
+        console.warn("[flow-switch] RED.i18n.registerMessageCatalog is not available. Skipping message catalog registration. All translations will be unavailable.");
+    }
+    // --- Fin du chargement du catalogue ---
+
+    function FlowSwitchNode(config) {
         RED.nodes.createNode(this, config);
         var node = this;
 
         node.name = config.name;
-        // 'node.active' est l'état d'exécution, initialisé par 'currentState' de la config (état au démarrage).
-        node.active = config.currentState === true || config.currentState === 'true';
 
-        // Configuration pour le contrôle par message
+        // Lire le mode de déploiement et les états configurés
+        node.deployMode = config.deployMode || "initialState"; // Valeur par défaut si non défini
+        var deployStateBool = config.deployState === true || config.deployState === 'true';
+        var activeButtonStateBool = config._activeButtonState === true || config._activeButtonState === 'true';
+
+        // Initialiser l'état actif du nœud (node.active) en fonction du deployMode
+        if (node.deployMode === "lastState") {
+            // Si le mode est de conserver le dernier état, initialiser avec _activeButtonState
+            // (qui était l'état du bouton dans l'éditeur lors du dernier déploiement/sauvegarde)
+            node.active = activeButtonStateBool;
+        } else {
+            // Sinon (mode "initialState" ou par défaut), initialiser avec deployState
+            node.active = deployStateBool;
+        }
+
         node.controlTopic = config.controlTopic ? config.controlTopic.trim() : "";
         node.onValue = config.onValue;
         node.offValue = config.offValue;
         node.toggleValue = config.toggleValue;
 
-        // Champs de configuration pour le texte du statut et la transmission des messages
-        node.onStatusText = config.onStatusText || "on"; // Valeur par défaut si non défini
-        node.offStatusText = config.offStatusText || "off"; // Valeur par défaut si non défini
+        var defaultOnTextValue = "on";
+        var i18nOnText = (RED && RED.i18n) ? RED._("defaults.onText") : defaultOnTextValue;
+        node.onStatusText = config.onStatusText || (i18nOnText === "defaults.onText" ? defaultOnTextValue : i18nOnText);
+
+        var defaultOffTextValue = "off";
+        var i18nOffText = (RED && RED.i18n) ? RED._("defaults.offText") : defaultOffTextValue;
+        node.offStatusText = config.offStatusText || (i18nOffText === "defaults.offText" ? defaultOffTextValue : i18nOffText);
+        
         node.passThrough = config.passThrough === true || config.passThrough === 'true';
 
         function updateStatus() {
@@ -26,13 +65,11 @@ module.exports = function(RED) {
                 node.status({ fill: "red", shape: "ring", text: node.offStatusText });
             }
         }
-        updateStatus(); // Définit le statut initial lors du déploiement
+        updateStatus(); // Définit le statut initial basé sur node.active
 
         node.on('input', function(msg, send, done) {
             let handledAsControlMessage = false;
-            // let stateChangedByControl = false; // Variable non utilisée, peut être enlevée si pas de logique future
 
-            // Vérifie si c'est un message de contrôle
             if (node.controlTopic && msg.hasOwnProperty('topic') && msg.topic === node.controlTopic) {
                 handledAsControlMessage = true;
                 const originalState = node.active;
@@ -45,24 +82,25 @@ module.exports = function(RED) {
                 } else if (payloadStr === node.toggleValue) {
                     node.active = !node.active;
                 } else {
-                    // Utiliser le nouveau nom de nœud pour les messages d'erreur/avertissement si i18n est configuré
-                    node.warn(RED._("flow-switch.warn.unrecognized-payload", { topic: node.controlTopic, payload: payloadStr }));
+                    let warnMsgKey = "warn.unrecognizedPayload";
+                    let warnMsgFallback = `Unrecognized payload for control topic ${node.controlTopic}: ${payloadStr}`;
+                    let warnMsg = (RED && RED.i18n) ? RED._(warnMsgKey, { topic: node.controlTopic, payload: payloadStr }) : warnMsgFallback;
+                    if (warnMsg === warnMsgKey) warnMsg = warnMsgFallback;
+                    node.warn(warnMsg);
                 }
 
                 if (originalState !== node.active) {
-                    // stateChangedByControl = true; // Variable non utilisée
                     updateStatus();
                 }
             }
 
-            // Gestion de la transmission des messages
             if (handledAsControlMessage) {
                 if (node.passThrough) {
-                    send(msg); // Transmet le message de contrôle si l'option est activée
+                    send(msg);
                 }
-            } else { // Ce n'est pas un message de contrôle
+            } else {
                 if (node.active) {
-                    send(msg); // Transmet les messages normaux si l'interrupteur est ON
+                    send(msg);
                 }
             }
 
@@ -76,50 +114,49 @@ module.exports = function(RED) {
         });
     }
 
-    // Enregistre le type de nœud avec le nouveau nom "flow-switch"
-    RED.nodes.registerType("flow-switch", FlowSwitchNode); // Nom du type mis à jour
+    RED.nodes.registerType("flow-switch", FlowSwitchNode);
 
-    // Endpoint HTTP Admin pour le bouton UI, URL mise à jour
     RED.httpAdmin.post("/flow-switch-admin/:id/state", RED.auth.needsPermission("flows.write"), function(req, res) {
         var runtimeNode = RED.nodes.getNode(req.params.id);
         if (runtimeNode != null) {
             try {
-                var newState = req.body.state;
-                // Vérification robuste du type de newState
-                if (newState === true || newState === 'true' || newState === false || newState === 'false') {
-                    runtimeNode.active = (newState === true || newState === 'true');
-                    
-                    // Utilise les textes de statut configurés par l'utilisateur
-                    if (runtimeNode.active) {
-                        runtimeNode.status({ fill: "green", shape: "dot", text: runtimeNode.onStatusText });
-                    } else {
-                        runtimeNode.status({ fill: "red", shape: "ring", text: runtimeNode.offStatusText });
-                    }
-                    res.sendStatus(200);
+                var newStateFromEditor = req.body.state; // Ceci est la valeur de _activeButtonState depuis l'éditeur
+                var newStateBool;
+
+                if (newStateFromEditor === true || newStateFromEditor === 'true') {
+                    newStateBool = true;
+                } else if (newStateFromEditor === false || newStateFromEditor === 'false') {
+                    newStateBool = false;
                 } else {
-                    res.status(400).send("Invalid state in request body. Expecting a boolean or 'true'/'false'. Received: " + newState + " (Type: " + typeof newState + ")");
+                    console.error("[flow-switch] Invalid state received from editor. Expected boolean or 'true'/'false'. Received:", newStateFromEditor, "(Type:", typeof newStateFromEditor, ")");
+                    let errorMsgKey = "error.invalidState";
+                    let errorMsgFallback = `Invalid state: ${newStateFromEditor}`;
+                    let errorMsg = (RED && RED.i18n) ? RED._(errorMsgKey, { state: newStateFromEditor, type: typeof newStateFromEditor }) : errorMsgFallback;
+                    if (errorMsg === errorMsgKey) errorMsg = errorMsgFallback;
+                    res.status(400).send(errorMsg);
+                    return;
                 }
+                
+                runtimeNode.active = newStateBool; // L'état actif du runtime est mis à jour par le bouton de l'éditeur
+                
+                if (runtimeNode.active) {
+                    runtimeNode.status({ fill: "green", shape: "dot", text: runtimeNode.onStatusText });
+                } else {
+                    runtimeNode.status({ fill: "red", shape: "ring", text: runtimeNode.offStatusText });
+                }
+                res.sendStatus(200);
             } catch (err) {
+                console.error("[flow-switch] Error processing state change from editor:", err);
+                let errorFailedToggleKey = "error.failedToToggle";
+                let errorFailedToggleFallback = `Failed to toggle: ${err.toString()}`;
+                let errorFailedToggle = (RED && RED.i18n) ? RED._(errorFailedToggleKey, { error: err.toString() }) : errorFailedToggleFallback;
+                if (errorFailedToggle === errorFailedToggleKey) errorFailedToggle = errorFailedToggleFallback;
+                runtimeNode.error(errorFailedToggle);
                 res.sendStatus(500);
-                // Utiliser le nouveau nom de nœud pour les messages d'erreur si i18n est configuré
-                runtimeNode.error(RED._("flow-switch.error.failed-to-toggle", { error: err.toString() }));
             }
         } else {
+            console.error("[flow-switch] Runtime node not found for ID:", req.params.id);
             res.sendStatus(404);
         }
     });
-
-    // Si vous utilisez l'internationalisation (i18n), mettez à jour les clés ici aussi
-    /*
-    RED.i18n.registerMessageCatalog("en-US", "node-red", {
-        "flow-switch": { // Clé principale mise à jour
-            "warn": {
-                "unrecognized-payload": "Control message received on topic '__topic__' with unrecognized payload: '__payload__'"
-            },
-            "error": {
-                "failed-to-toggle": "Failed to toggle switch state: __error__"
-            }
-        }
-    });
-    */
 };

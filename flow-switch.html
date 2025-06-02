@@ -1,32 +1,46 @@
 <script type="text/javascript">
-    RED.nodes.registerType('flow-switch', { // Nom du nœud changé
+    RED.nodes.registerType('flow-switch', {
         category: 'function',
         color: '#E6E0F8',
         defaults: {
             name: { value: "" },
-            currentState: { value: true, required: true }, // Ceci est "l'État au démarrage"
-            controlTopic: { value: "" },
+            deployState: { value: true, required: true }, 
+            _activeButtonState: { value: true }, 
+            deployMode: { value: "initialState", required: true },
+            controlTopic: { value: "control" },
             onValue: { value: "on" },
             offValue: { value: "off" },
             toggleValue: { value: "toggle" },
-            onStatusText: { value: "on" },
+            onStatusText: { value: "on" }, 
             offStatusText: { value: "off" },
             passThrough: { value: false }
         },
         inputs: 1,
         outputs: 1,
-        icon: "font-awesome/fa-toggle-on", // Icône statique
+        icon: "font-awesome/fa-toggle-on", 
+        paletteLabel: function() { 
+            var label = RED._("paletteLabel");
+            return (label === "paletteLabel") ? "flow switch" : label;
+        },
         label: function() {
-            return this.name || "flow-switch"; // Label par défaut changé
+            if (this.name) {
+                return this.name;
+            }
+            var label = RED._("paletteLabel");
+            return (label === "paletteLabel") ? "flow switch" : label;
         },
         oneditprepare: function() {
-            if (typeof this.currentState !== 'boolean') { 
-                this.currentState = (this.currentState === 'true' || this.currentState === true);
+            if (typeof this.deployState !== 'boolean') { 
+                this.deployState = (this.deployState === 'true' || this.deployState === true);
             }
-            this._editorButtonState = this.currentState; 
+            $('#node-input-deployState').val(this.deployState.toString()); 
 
-            $('#node-input-currentState').val(this.currentState.toString());
-            $('#node-input-onStatusText').val(this.onStatusText);
+            if (!this.deployMode) {
+                this.deployMode = "initialState";
+            }
+            $('#node-input-deployMode').val(this.deployMode);
+
+            $('#node-input-onStatusText').val(this.onStatusText); 
             $('#node-input-offStatusText').val(this.offStatusText);
             
             if (typeof this.passThrough !== 'boolean') {
@@ -35,118 +49,143 @@
             $('#node-input-passThrough').prop('checked', this.passThrough);
         },
         oneditsave: function() {
-            this.currentState = ($('#node-input-currentState').val() === 'true');
+            this.deployState = ($('#node-input-deployState').val() === 'true');
+            this.deployMode = $('#node-input-deployMode').val();
+            
+            if (this.deployMode === "initialState") {
+                this._activeButtonState = this.deployState; 
+            }
             this.passThrough = $('#node-input-passThrough').is(':checked');
         },
         button: {
+            toggle: '_activeButtonState', 
             visible: true,
-            onclick: function() {
-                this._editorButtonState = !this._editorButtonState;
-                var stateToSend = this._editorButtonState;
+            onclick: function(newStateFromToggle) { 
+                var stateToSend = this._activeButtonState; 
+                var node = this;
 
-                console.log("[flow-switch] Bouton cliqué (manuel). Nouvel état envoyé au runtime :", stateToSend); // Log mis à jour
+                var notifyStateKey = stateToSend ? "notify.activated" : "notify.deactivated";
+                var notifyStateText = (RED && RED.i18n) ? RED._(notifyStateKey) : (stateToSend ? "Activated" : "Deactivated");
+                if (notifyStateText === notifyStateKey) { 
+                    notifyStateText = stateToSend ? "Activated" : "Deactivated";
+                }
+                var notifyRuntimeKey = "notify.runtimeState";
+                var notifyRuntimeText = (RED && RED.i18n) ? RED._(notifyRuntimeKey) : "Switch (runtime)";
+                if (notifyRuntimeText === notifyRuntimeKey) { 
+                    notifyRuntimeText = "Switch (runtime)";
+                }
+                var notifyCommErrorKey = "notify.communicationError";
+                var notifyCommErrorText = (RED && RED.i18n) ? RED._(notifyCommErrorKey) : "Communication error";
+                 if (notifyCommErrorText === notifyCommErrorKey) { 
+                    notifyCommErrorText = "Communication error";
+                }
 
                 $.ajax({
-                    url: `flow-switch-admin/${this.id}/state`, // URL AJAX mise à jour
+                    url: `flow-switch-admin/${this.id}/state`,
                     type: "POST",
                     contentType: "application/json",
-                    data: JSON.stringify({ state: stateToSend }),
+                    data: JSON.stringify({ state: stateToSend }), 
                     success: function(response) {
-                        RED.notify("Interrupteur (runtime) : " + (stateToSend ? "Activé" : "Désactivé"), "success", null, 1000);
+                        RED.notify(notifyRuntimeText + ": " + notifyStateText, "success", null, 1000);
                     },
                     error: function(jqXHR, textStatus, errorThrown) {
-                        RED.notify("Erreur de communication : " + errorThrown, "error");
-                    }.bind(this)
+                        node._activeButtonState = !stateToSend; 
+                        RED.nodes.dirty(true); 
+                        RED.notify(notifyCommErrorText + ": " + errorThrown, "error");
+                    }.bind(this) 
                 });
             }
         }
     });
 </script>
 
-<script type="text/x-red" data-template-name="flow-switch"> {/* Nom du template changé */}
+<script type="text/x-red" data-template-name="flow-switch">
     <div class="form-row">
-        <label for="node-input-name"><i class="fa fa-tag"></i> Nom</label>
-        <input type="text" id="node-input-name" placeholder="Nom">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="label.name">Name</span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]placeholder.name" placeholder="Flow Switch Name">
     </div>
     <div class="form-row">
-        <label for="node-input-currentState"><i class="fa fa-cogs"></i> État au démarrage</label>
-        <select id="node-input-currentState">
-            <option value="true">on (activé)</option>
-            <option value="false">off (désactivé)</option>
+        <label for="node-input-deployMode"><i class="fa fa-history"></i> <span data-i18n="label.deployMode">Behavior on Deploy</span></label>
+        <select id="node-input-deployMode"> 
+            <option value="initialState" data-i18n="options.deployModeInitial">Use 'Initial state on deploy' value</option>
+            <option value="lastState" data-i18n="options.deployModeLast">Keep last active state</option>
         </select>
-        {/* Tooltip supprimé */}
-    </div>
-    <hr/>
-    <h4>Affichage du Statut (sous le nœud)</h4>
-    <div class="form-row">
-        <label for="node-input-onStatusText"><i class="fa fa-commenting-o"></i> Texte si ON</label>
-        <input type="text" id="node-input-onStatusText" placeholder="on">
     </div>
     <div class="form-row">
-        <label for="node-input-offStatusText"><i class="fa fa-commenting-o"></i> Texte si OFF</label>
-        <input type="text" id="node-input-offStatusText" placeholder="off">
-    </div>
-    <hr/>
-    <h4>Contrôle par Message</h4>
-    <div class="form-row">
-        <label for="node-input-controlTopic"><i class="fa fa-envelope"></i> Sujet de contrôle (<code>msg.topic</code>)</label>
-        <input type="text" id="node-input-controlTopic" placeholder="ex: cmnd/interrupteur/etat">
-        {/* Tooltip supprimé */}
-    </div>
-    <div class="form-row">
-        <label><i class="fa fa-asterisk"></i> Valeurs de commande (<code>msg.payload</code>)</label>
-    </div>
-    <div class="form-row">
-        <label for="node-input-onValue" style="padding-left: 20px;"><i class="fa fa-check-circle-o"></i> pour Activer</label>
-        <input type="text" id="node-input-onValue" placeholder="on">
-        {/* Tooltip supprimé */}
-    </div>
-    <div class="form-row">
-        <label for="node-input-offValue" style="padding-left: 20px;"><i class="fa fa-times-circle-o"></i> pour Désactiver</label>
-        <input type="text" id="node-input-offValue" placeholder="off">
-        {/* Tooltip supprimé */}
-    </div>
-    <div class="form-row">
-        <label for="node-input-toggleValue" style="padding-left: 20px;"><i class="fa fa-exchange"></i> pour Basculer</label>
-        <input type="text" id="node-input-toggleValue" placeholder="toggle">
-        {/* Tooltip supprimé */}
+        <label for="node-input-deployState"><i class="fa fa-cogs"></i> <span data-i18n="label.initialState">Initial state on deploy</span></label>
+        <select id="node-input-deployState"> 
+            <option value="true" data-i18n="options.onActive">on (active)</option>
+            <option value="false" data-i18n="options.offInactive">off (inactive)</option>
+        </select>
     </div>
     <div class="form-row">
         <input type="checkbox" id="node-input-passThrough" style="display: inline-block; width: auto; vertical-align: top;">
-        <label for="node-input-passThrough" style="width: auto; margin-left: 7px;"><i class="fa fa-share-square-o"></i> Transmettre le message de contrôle ?</label>
-        {/* Tooltip supprimé */}
+        <label for="node-input-passThrough" style="width: auto; margin-left: 7px;"><i class="fa fa-share-square-o"></i> <span data-i18n="label.passThrough">Pass through control message?</span></label>
+    </div>
+    <hr/>
+    <h4 data-i18n="label.statusDisplay">Status Display (under node)</h4>
+    <div class="form-row">
+        <label for="node-input-onStatusText"><i class="fa fa-commenting-o"></i> <span data-i18n="label.textIfON">Text if ON</span></label>
+        <input type="text" id="node-input-onStatusText" data-i18n="[placeholder]placeholder.onStatusText" placeholder="on">
+    </div>
+    <div class="form-row">
+        <label for="node-input-offStatusText"><i class="fa fa-commenting-o"></i> <span data-i18n="label.textIfOFF">Text if OFF</span></label>
+        <input type="text" id="node-input-offStatusText" data-i18n="[placeholder]placeholder.offStatusText" placeholder="off">
+    </div>
+    <hr/>
+    <h4 data-i18n="label.controlByMessage">Control by Message</h4>
+    <div class="form-row">
+        <label for="node-input-controlTopic"><i class="fa fa-envelope"></i> <span data-i18n="label.controlTopicShort">Control Topic</span></label>
+        <input type="text" id="node-input-controlTopic" data-i18n="[placeholder]placeholder.controlTopic" placeholder="e.g., cmnd/switch/state">
+    </div>
+    <div class="form-row">
+        <label><i class="fa fa-asterisk"></i> <span data-i18n="label.controlValuesShort">Control Values</span></label>
+    </div>
+    <div class="form-row">
+        <label for="node-input-onValue" style="padding-left: 20px;"><i class="fa fa-check-circle-o"></i> <span data-i18n="label.valueForON">for ON</span></label>
+        <input type="text" id="node-input-onValue" data-i18n="[placeholder]placeholder.onValue" placeholder="on">
+    </div>
+    <div class="form-row">
+        <label for="node-input-offValue" style="padding-left: 20px;"><i class="fa fa-times-circle-o"></i> <span data-i18n="label.valueForOFF">for OFF</span></label>
+        <input type="text" id="node-input-offValue" data-i18n="[placeholder]placeholder.offValue" placeholder="off">
+    </div>
+    <div class="form-row">
+        <label for="node-input-toggleValue" style="padding-left: 20px;"><i class="fa fa-exchange"></i> <span data-i18n="label.valueForToggle">for Toggle</span></label>
+        <input type="text" id="node-input-toggleValue" data-i18n="[placeholder]placeholder.toggleValue" placeholder="toggle">
     </div>
 </script>
 
-<script type="text/x-red" data-help-name="flow-switch"> {/* Nom de l'aide changé */}
-    <p>Un interrupteur (flow switch) qui peut arrêter ou autoriser un flux de messages à continuer. Il peut être contrôlé par son bouton UI ou par des messages entrants.</p>
-    <p>Cliquez sur le bouton à droite du nœud pour envoyer une commande de basculement à l'état d'exécution du nœud. L'état d'exécution actuel est indiqué par le statut visuel sous le nœud.</p>
+<script type="text/x-red" data-help-name="flow-switch">
+    <p data-i18n="help.brief">A switch node that can gate message flow, controlled by its UI button or by messages.</p>
+    <p data-i18n="help.clickButton">Click the button on the node to toggle its runtime state. The current runtime state is shown in the status display below the node, using customizable text.</p>
     
-    <h3>Configuration</h3>
+    <h3 data-i18n="help.configTitle">Configuration</h3>
     <dl class="message-properties">
-        <dt>État au démarrage</dt>
-        <dd>Définit l'état de l'interrupteur (ON ou OFF) qui sera appliqué uniquement lorsque le flux est déployé ou que Node-RED redémarre. Cet état n'est pas modifié par le bouton dans l'éditeur.</dd>
-        <dt>Texte si ON</dt>
-        <dd>Le texte à afficher dans le statut du nœud lorsque l'interrupteur est ON. Défaut: "on".</dd>
-        <dt>Texte si OFF</dt>
-        <dd>Le texte à afficher dans le statut du nœud lorsque l'interrupteur est OFF. Défaut: "off".</dd>
+        <dt data-i18n="label.deployMode">Behavior on Deploy</dt>
+        <dd data-i18n="help.deployModeDesc">Determines how the switch initializes its state upon deployment or restart.</dd>
+        <dt data-i18n="help.initialState">Initial state on deploy</dt>
+        <dd data-i18n="help.initialStateDescDeployMode">Defines the switch state (ON or OFF) applied if "Use 'Initial state on deploy' value" is chosen. This is not changed by the editor button.</dd>
+        <dt data-i18n="label.passThrough">Pass through control message?</dt>
+        <dd data-i18n="help.passThroughDesc">If checked, the control message will be forwarded to the output after the action. Otherwise, control messages are consumed.</dd>
+        <dt data-i18n="help.textIfON">Text if ON</dt>
+        <dd data-i18n="help.textIfONDesc">Text shown in node status when ON. Default: "on".</dd>
+        <dt data-i18n="help.textIfOFF">Text if OFF</dt>
+        <dd data-i18n="help.textIfOFFDesc">Text shown in node status when OFF. Default: "off".</dd>
     </dl>
-
-    <h3>Contrôle par Message</h3>
-    <p>Le nœud peut être contrôlé dynamiquement en envoyant un message.</p>
+    <h3 data-i18n="help.controlByMessageTitle">Control by Message</h3>
+    <p data-i18n="help.controlByMessageDesc">The node can be dynamically controlled by an incoming message.</p>
     <dl class="message-properties">
-        <dt>Sujet de contrôle (<code>msg.topic</code>)</dt>
-        <dd>Si ce champ est configuré, le nœud traitera les messages entrants où <code>msg.topic</code> correspond à cette valeur comme des commandes. Le <code>msg.payload</code> sera alors utilisé pour contrôler l'interrupteur.</dd>
-        <dt>Valeurs de commande (<code>msg.payload</code>)</dt>
+        <dt data-i18n="help.controlTopic">Control Topic (msg.topic)</dt>
+        <dd data-i18n="help.controlTopicDesc">If set, the node will treat incoming messages where <code>msg.topic</code> matches this value as commands. <code>msg.payload</code> will then be used to control the switch.</dd>
+        <dt data-i18n="help.controlValues">Control Values (<code>msg.payload</code>)</dt>
         <dd>
-            <ul>
-                <li><strong>pour Activer:</strong> Si <code>msg.payload</code> correspond à cette valeur, l'interrupteur passera à ON.</li>
-                <li><strong>pour Désactiver:</strong> Si <code>msg.payload</code> correspond à cette valeur, l'interrupteur passera à OFF.</li>
-                <li><strong>pour Basculer:</strong> Si <code>msg.payload</code> correspond à cette valeur, l'état de l'interrupteur sera inversé.</li>
+            <ul style="list-style-type: disc; margin-left: 20px;">
+                <li data-i18n="help.valueForONDesc">If <code>msg.payload</code> matches this value, switch turns ON.</li>
+                <li data-i18n="help.valueForOFFDesc">If <code>msg.payload</code> matches this value, switch turns OFF.</li>
+                <li data-i18n="help.valueForToggleDesc">If <code>msg.payload</code> matches this value, switch state is toggled.</li>
             </ul>
         </dd>
-        <dt>Transmettre le message de contrôle ?</dt>
-        <dd>Si coché, le message qui a servi à contrôler l'interrupteur sera transmis à la sortie du nœud après que l'action ait été effectuée. Sinon, les messages de contrôle sont consommés par le nœud.</dd>
     </dl>
-    <p>Les messages qui ne sont pas des messages de contrôle sont transmis à la sortie uniquement si l'interrupteur est ON.</p>
+    <p data-i18n="help.unrecognizedPayloadWarn">If a message is received on the control topic but its payload doesn't match any configured values (ON, OFF, Toggle), a warning will be issued, and the switch state will not change.</p>
+    <p data-i18n="help.nonControlMessages">Non-control messages are only passed to the output if the switch is ON.</p>
 </script>
